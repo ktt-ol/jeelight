@@ -52,9 +52,8 @@ public:
 
 
 class FadeTask: public LightTask {
-    byte r, g, b, w;
-    float rTmp, gTmp, bTmp, wTmp;
-    float rDist, gDist, bDist, wDist;
+    byte rTarget, gTarget, bTarget, wTarget;
+    float rCurrent, gCurrent, bCurrent, wCurrent;
     int maxStep;
     int currentStep;
     float rStep, gStep, bStep, wStep;
@@ -66,31 +65,33 @@ public:
     {}
 
     void setTargetColor(const byte r, const byte g, const byte b, const byte w, const long duration=1000) {
-        rDist = r - light.r;
-        gDist = g - light.g;
-        bDist = b - light.b;
-        wDist = w - light.w;
+        // calculate distances between current and target colors
+        float rDistance = r - light.r;
+        float gDistance = g - light.g;
+        float bDistance = b - light.b;
+        float wDistance = w - light.w;
 
-        this->rTmp = light.r;
-        this->gTmp = light.g;
-        this->bTmp = light.b;
-        this->wTmp = light.w;
 
-        this->r = r;
-        this->g = g;
-        this->b = b;
-        this->w = w;
+        this->rCurrent = light.r;
+        this->gCurrent = light.g;
+        this->bCurrent = light.b;
+        this->wCurrent = light.w;
 
-        maxStep = max(max(max(abs(rDist), abs(gDist)), abs(bDist)), abs(wDist));
+        this->rTarget = r;
+        this->gTarget = g;
+        this->bTarget = b;
+        this->wTarget = w;
+
+        maxStep = max(max(max(abs(rDistance), abs(gDistance)), abs(bDistance)), abs(wDistance));
         if (maxStep == 0) {
             return;
         }
 
         currentStep = 0;
-        rStep = rDist / maxStep;
-        gStep = gDist / maxStep;
-        bStep = bDist / maxStep;
-        wStep = wDist / maxStep;
+        rStep = rDistance / maxStep;
+        gStep = gDistance / maxStep;
+        bStep = bDistance / maxStep;
+        wStep = wDistance / maxStep;
 
         stepDelay = duration / maxStep;
         lastStepTime = millis();
@@ -99,19 +100,19 @@ public:
 
 public:
     bool step() {
-        if (millis() - lastStepTime > stepDelay) {
+        while (millis() - lastStepTime > stepDelay) {
             if (currentStep >= maxStep) {
-                light.sendColor(r, g, b, w);
+                light.sendColor(rTarget, gTarget, bTarget, wTarget);
                 active = false;
                 return false;
             }
             currentStep += 1;
-            rTmp += rStep;
-            gTmp += gStep;
-            bTmp += bStep;
-            wTmp += wStep;
-            light.sendColor(rTmp, gTmp, bTmp, wTmp);
-            lastStepTime = millis();
+            rCurrent += rStep;
+            gCurrent += gStep;
+            bCurrent += bStep;
+            wCurrent += wStep;
+            light.sendColor(rCurrent, gCurrent, bCurrent, wCurrent);
+            lastStepTime += stepDelay;
         }
         return true;
     }
