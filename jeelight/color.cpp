@@ -14,10 +14,11 @@ static float _v(const float m1, const float m2, float hue) {
         return m2;
     if (hue < TWO_THIRD)
         return m1 + (m2 - m1) * (TWO_THIRD - hue) * 6.0;
+    return m1;
 }
 
 static inline uint8_t float_to_uint8(float value) {
-    return (value * 180) + (255 - 180);
+    return value * 255;
 }
 
 void hls_to_rgb(const float h, const float l, const float s, uint8_t *r, uint8_t *g, uint8_t *b) {
