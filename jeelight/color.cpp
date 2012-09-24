@@ -21,7 +21,7 @@ static inline uint8_t float_to_uint8(float value) {
     return value * 255;
 }
 
-void hls_to_rgb(const float h, const float l, const float s, uint8_t *r, uint8_t *g, uint8_t *b) {
+void hsl_to_rgb(const float h, const float s, const float l, uint8_t *r, uint8_t *g, uint8_t *b) {
     float m1, m2;
     if (s <= 0.0) {
         *r = float_to_uint8(l);

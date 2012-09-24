@@ -52,7 +52,7 @@ void loop() {
             case 'f':
                 success = (
                     sscanf(buf.buf, "f %hhu %hhu %hhu %hhu %u",
-                        &(cmd.r), &(cmd.g), &(cmd.b), &(cmd.w), &(cmd.duration))
+                        &(cmd.fade.color.r), &(cmd.fade.color.g), &(cmd.fade.color.b), &(cmd.fade.color.w), &(cmd.fade.duration))
                     == 5
                 );
                 cmd.type = FADETO;
@@ -69,10 +69,22 @@ void loop() {
                 cmd.type = RANDOM;
                 success = (
                     sscanf(buf.buf, "r %hhu %hhu %u",
-                        &(cmd.r), &(cmd.g), &(cmd.duration))
+                        &(cmd.random.s), &(cmd.random.l), &(cmd.random.duration))
                     == 3
                 );
                 success = true;
+                break;
+            case 'b':
+                success = (
+                    sscanf(buf.buf, "b %hhu %hhu %hhu %hhu %u %hhu %hhu %hhu %hhu %u %u",
+                        &(cmd.blink.on_color.r), &(cmd.blink.on_color.g), &(cmd.blink.on_color.b),
+                        &(cmd.blink.on_color.w), &(cmd.blink.on_duration),
+                        &(cmd.blink.off_color.r), &(cmd.blink.off_color.g), &(cmd.blink.off_color.b),
+                        &(cmd.blink.off_color.w), &(cmd.blink.off_duration),
+                        &(cmd.blink.repeat))
+                    == 11
+                );
+                cmd.type = BLINK;
                 break;
         }
         if (success) {

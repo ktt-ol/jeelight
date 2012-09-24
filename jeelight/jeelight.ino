@@ -24,7 +24,7 @@ protected:
         i2c.write(r >> 2);
         i2c.write(g >> 2);
         i2c.write(b >> 2);
-        i2c.write(w >> 2);
+        i2c.write(128 >> 2);
         i2c.stop();
     }
 };
@@ -51,6 +51,76 @@ public:
 };
 
 
+
+class BlinkTask : public LightTask {
+    byte rOn, gOn, bOn, wOn;
+    byte rOff, gOff, bOff, wOff;
+    unsigned int durationOn, durationOff;
+    byte repeat;
+    bool on;
+    unsigned long nextSwitchTime;
+    LightTask **currentTaskPointer;
+    LightTask *previousTask;
+
+public:
+    BlinkTask(DimLight &light) :
+        LightTask(light)
+    {}
+
+    void setOnColor(const byte r, const byte g, const byte b, const byte w, const long duration=1000) {
+        rOn = r;
+        gOn = g;
+        bOn = b;
+        wOn = w;
+        durationOn = duration;
+    };
+
+    void setOffColor(const byte r, const byte g, const byte b, const byte w, const long duration=1000) {
+        rOff = r;
+        gOff = g;
+        bOff = b;
+        wOff = w;
+        durationOff = duration;
+    };
+
+    void setRepeat(byte repeat) {
+        this->repeat = repeat;
+        active = true;
+        on = true;
+        light.sendColor(rOn, gOn, bOn, wOn);
+        nextSwitchTime = millis() + durationOn;
+    }
+
+    void setPreviousTask(LightTask **currentTaskPointer, LightTask *previousTask) {
+        this->currentTaskPointer = currentTaskPointer;
+        this->previousTask = previousTask;
+    }
+
+    bool step() {
+        if (nextSwitchTime > millis()) {
+            return false;
+        }
+        if (repeat <= 0) {
+            active = false;
+            *currentTaskPointer = previousTask;
+            return true;
+        }
+
+        if (on) {
+            on = false;
+            light.sendColor(rOff, gOff, bOff, wOff);
+            nextSwitchTime = millis() + durationOff;
+        } else {
+            on = true;
+            light.sendColor(rOn, gOn, bOn, wOn);
+            nextSwitchTime = millis() + durationOn;
+            repeat -= 1;
+        }
+        return false;
+    };
+};
+
+
 class FadeTask: public LightTask {
     byte rTarget, gTarget, bTarget, wTarget;
     float rCurrent, gCurrent, bCurrent, wCurrent;
@@ -64,13 +134,22 @@ public:
         LightTask(light)
     {}
 
-    void setTargetColor(const byte r, const byte g, const byte b, const byte w, const long duration=1000) {
+    void setTargetColor(byte r, byte g, byte b, byte w, const long duration=1000) {
+
+        if (r == light.r && g == light.g && b == light.b && w == light.w) {
+            // hit the same color, change w so that we don't get
+            // division zero later
+            if (w < 128) {
+                w += 1;
+            } else {
+                w -= 1;
+            }
+        }
         // calculate distances between current and target colors
         float rDistance = r - light.r;
         float gDistance = g - light.g;
         float bDistance = b - light.b;
         float wDistance = w - light.w;
-
 
         this->rCurrent = light.r;
         this->gCurrent = light.g;
@@ -83,9 +162,6 @@ public:
         this->wTarget = w;
 
         maxStep = max(max(max(abs(rDistance), abs(gDistance)), abs(bDistance)), abs(wDistance));
-        if (maxStep == 0) {
-            return;
-        }
 
         currentStep = 0;
         rStep = rDistance / maxStep;
@@ -152,8 +228,13 @@ public:
             s = defaultSaturation;
         }
 
-        hls_to_rgb(h, (byte)(l * 255), (byte)(s * 255), &r, &g, &b);
+        hsl_to_rgb(h, (byte)(l * 255), (byte)(s * 255), &r, &g, &b);
         setTargetColor(r, g, b, 0, duration);
+        Serial.print("FADETO RANDOM ");
+        Serial.print(r); Serial.print(' ');
+        Serial.print(g); Serial.print(' ');
+        Serial.print(b); Serial.print(' ');
+        Serial.print(duration); Serial.println(' ');
     }
 
     bool step() {
@@ -176,6 +257,7 @@ DimCommand cmd;
 
 FadeTask fadeTask(light);
 RandomFadeTask randomFadeTask(light);
+BlinkTask blinkTask(light);
 LightTask *currentTask;
 
 void setup() {
@@ -205,13 +287,19 @@ void loop() {
             light.sendColor(255, 255, 255, 255);
             currentTask = NULL;
         } else if (cmd.type == FADETO) {
-            fadeTask.setTargetColor(cmd.r, cmd.g, cmd.b, cmd.w, cmd.duration);
+            fadeTask.setTargetColor(cmd.fade.color.r, cmd.fade.color.g, cmd.fade.color.b, cmd.fade.color.w, cmd.fade.duration);
             currentTask = &fadeTask;
         } else if (cmd.type == RANDOM) {
-            randomFadeTask.setColorParams(cmd.r, cmd.g);
-            randomFadeTask.setFadeDuration(cmd.duration);
+            randomFadeTask.setColorParams(cmd.random.s, cmd.random.l);
+            randomFadeTask.setFadeDuration(cmd.random.duration);
             randomFadeTask.setRandomTargetColor();
             currentTask = &randomFadeTask;
+        } else if (cmd.type == BLINK) {
+            blinkTask.setOnColor(cmd.blink.on_color.r, cmd.blink.on_color.g, cmd.blink.on_color.b, cmd.blink.on_color.w, cmd.blink.on_duration);
+            blinkTask.setOffColor(cmd.blink.off_color.r, cmd.blink.off_color.g, cmd.blink.off_color.b, cmd.blink.off_color.w, cmd.blink.off_duration);
+            blinkTask.setRepeat(cmd.blink.repeat);
+            blinkTask.setPreviousTask(&currentTask, currentTask);
+            currentTask = &blinkTask;
         } else {
             Serial.println("Error: unknown cmd");
         }

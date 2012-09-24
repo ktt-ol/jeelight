@@ -3,6 +3,6 @@
 
 #include <stdint.h>
 
-void hls_to_rgb(float h, float l, float s, uint8_t *r, uint8_t *g, uint8_t *b);
+void hsl_to_rgb(float h, float s, float l, uint8_t *r, uint8_t *g, uint8_t *b);
 
 #endif
