@@ -2,6 +2,7 @@
 #include <RF12.h>
 #include "../protocol.h"
 #include "color.h"
+#include "husl.h"
 
 class DimLight {
 protected:
@@ -194,6 +195,57 @@ public:
     }
 };
 
+class RandomHUSLFadeTask: public FadeTask {
+    byte lightness, saturation;
+    static const byte defaultLightness = 50;
+    static const byte defaultSaturation = 50;
+    int duration;
+public:
+    RandomHUSLFadeTask(DimLight &light) :
+        FadeTask(light), lightness(0), saturation(0),
+        duration(15000)
+    {
+        setRandomTargetColor();
+    }
+
+    void setColorParams(byte lightness, byte saturation) {
+        this->lightness = lightness;
+        this->saturation = saturation;
+    }
+    void setFadeDuration(int duration) {
+        this->duration = duration;
+    }
+
+    void setRandomTargetColor() {
+        float r, g, b;
+        byte l = lightness;
+        byte s = saturation;
+
+        float h = random(360);
+        if (lightness ==  0) {
+            l = defaultLightness;
+        }
+        if (saturation ==  0) {
+            s = defaultSaturation;
+        }
+
+        HUSLtoRGB(&r, &g, &b, h, l, s);
+        setTargetColor((byte)(r * 255), (byte)(g * 255), (byte)(b * 255), 0, duration);
+        Serial.print("FADETO RANDOM ");
+        Serial.print((byte)(r * 255)); Serial.print(' ');
+        Serial.print((byte)(g * 255)); Serial.print(' ');
+        Serial.print((byte)(b * 255)); Serial.print(' ');
+        Serial.print(duration); Serial.println(' ');
+    }
+
+    bool step() {
+        if (!FadeTask::step()) {
+            setRandomTargetColor();
+        }
+        return true;
+    }
+};
+
 class RandomFadeTask: public FadeTask {
     byte lightness, saturation;
     static const byte defaultLightness = 255 * 0.4;
@@ -228,7 +280,7 @@ public:
             s = defaultSaturation;
         }
 
-        hsl_to_rgb(h, (byte)(l * 255), (byte)(s * 255), &r, &g, &b);
+        hsl_to_rgb(h, s / 255.0f, l / 255.0f, &r, &g, &b);
         setTargetColor(r, g, b, 0, duration);
         Serial.print("FADETO RANDOM ");
         Serial.print(r); Serial.print(' ');
@@ -256,7 +308,7 @@ DimLight light(dac);
 DimCommand cmd;
 
 FadeTask fadeTask(light);
-RandomFadeTask randomFadeTask(light);
+RandomHUSLFadeTask randomFadeTask(light);
 BlinkTask blinkTask(light);
 LightTask *currentTask;
 
